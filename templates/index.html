@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Smart Waste Classification</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            text-align: center;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .status {
+            margin: 20px;
+            padding: 15px;
+            background: #eee;
+            border-radius: 10px;
+        }
+
+        #cameraStatus {
+            font-weight: bold;
+        }
+
+        #image {
+            max-width: 100%;
+            max-height: 450px;
+            margin-top: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #result {
+            font-size: 30px;
+            font-weight: bold;
+            margin-top: 25px;
+        }
+
+        .waiting {
+            color: #555;
+        }
+
+        .bio {
+            color: green;
+        }
+
+        .nonbio {
+            color: red;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+    <h1>♻️ Smart Waste Classification</h1>
+
+    <div class="status">
+
+        Camera:
+
+        <span id="cameraStatus">
+            Waiting for image...
+        </span>
+
+    </div>
+
+
+    <img id="image">
+
+
+    <div id="result" class="waiting">
+
+        Waiting for waste...
+
+    </div>
+
+</div>
+
+
+<script>
+
+let lastImage = "";
+
+
+async function checkStatus()
+{
+
+    try
+    {
+
+        const response = await fetch("/latest");
+
+        if (!response.ok)
+            return;
+
+        const data = await response.json();
+
+
+        if (data.filename && data.filename !== lastImage)
+        {
+
+            lastImage = data.filename;
+
+
+            document.getElementById("cameraStatus").innerText =
+                "Image received";
+
+
+            const img = document.getElementById("image");
+
+            img.src = "/images/" +
+                data.filename +
+                "?t=" +
+                Date.now();
+
+            img.style.display = "block";
+
+
+            const result =
+                document.getElementById("result");
+
+
+            result.innerText =
+                data.classification;
+
+
+            if (
+                data.classification
+                .toLowerCase()
+                .includes("biodegradable")
+            )
+            {
+                result.className = "bio";
+            }
+
+            else if (
+                data.classification
+                .toLowerCase()
+                .includes("non")
+            )
+            {
+                result.className = "nonbio";
+            }
+
+        }
+
+    }
+
+    catch(error)
+    {
+
+        console.log(error);
+
+    }
+
+}
+
+
+setInterval(checkStatus, 1000);
+
+</script>
+
+
+</body>
+
+</html>
