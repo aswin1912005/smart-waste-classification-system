@@ -1,190 +1,383 @@
 <!DOCTYPE html>
-
-<html>
+<html lang="en">
 
 <head>
 
     <meta charset="UTF-8">
 
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
     <title>Smart Waste Classification</title>
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background: #f2f2f2;
-            text-align: center;
             margin: 0;
-            padding: 40px;
+            font-family: Arial, sans-serif;
+            background: #f2f5f7;
+            color: #222;
+        }
+
+        .header {
+            background: #1f2937;
+            color: white;
+            padding: 22px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .header p {
+            margin: 8px 0 0;
+            color: #d1d5db;
         }
 
         .container {
-            max-width: 800px;
-            margin: auto;
+            max-width: 900px;
+            margin: 35px auto;
+            padding: 20px;
+        }
+
+        .card {
             background: white;
-            padding: 30px;
             border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
         }
 
-        h1 {
-            margin-bottom: 10px;
+        .image-box {
+            width: 100%;
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
         }
 
-        .status {
-            margin: 20px;
-            padding: 15px;
-            background: #eee;
-            border-radius: 10px;
-        }
-
-        #cameraStatus {
-            font-weight: bold;
-        }
-
-        #image {
+        .image-box img {
             max-width: 100%;
-            max-height: 450px;
-            margin-top: 20px;
-            border-radius: 10px;
+            max-height: 500px;
             display: none;
         }
 
-        #result {
-            font-size: 30px;
-            font-weight: bold;
-            margin-top: 25px;
+        #waiting {
+            color: #6b7280;
+            font-size: 20px;
         }
 
-        .waiting {
+        .result {
+            margin-top: 25px;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            background: #f9fafb;
+        }
+
+        #classification {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px;
+        }
+
+        #confidence {
+            font-size: 20px;
+            margin: 10px;
+        }
+
+        #reason {
+            font-size: 17px;
             color: #555;
+            margin-top: 15px;
         }
 
         .bio {
-            color: green;
+            color: #15803d;
         }
 
         .nonbio {
-            color: red;
+            color: #dc2626;
+        }
+
+        .processing {
+            color: #ea580c;
+        }
+
+        .status {
+            margin-top: 20px;
+            text-align: center;
+            color: #555;
         }
 
     </style>
 
 </head>
 
-
 <body>
 
-<div class="container">
+    <div class="header">
 
-    <h1>♻️ Smart Waste Classification</h1>
+        <h1>♻️ Smart Waste Classification</h1>
 
-    <div class="status">
-
-        Camera:
-
-        <span id="cameraStatus">
-            Waiting for image...
-        </span>
+        <p>
+            ESP32-CAM + Gemini AI
+        </p>
 
     </div>
 
 
-    <img id="image">
+    <div class="container">
+
+        <div class="card">
+
+            <div class="image-box">
+
+                <div id="waiting">
+                    Waiting for waste...
+                </div>
+
+                <img id="wasteImage"
+                     alt="Waste Image">
+
+            </div>
 
 
-    <div id="result" class="waiting">
+            <div class="result">
 
-        Waiting for waste...
+                <div id="classification"
+                     class="processing">
+
+                    Waiting...
+
+                </div>
+
+                <div id="confidence">
+                    Confidence: -
+                </div>
+
+                <div id="reason">
+                    Place waste on the sensor.
+                </div>
+
+            </div>
+
+
+            <div class="status">
+
+                Server:
+                <span id="serverStatus">
+                    Checking...
+                </span>
+
+            </div>
+
+        </div>
 
     </div>
-
-</div>
 
 
 <script>
 
-let lastImage = "";
+let lastFilename = null;
 
 
-async function checkStatus()
-{
+// =====================================
+// GET LATEST RESULT
+// =====================================
 
-    try
-    {
+async function updateResult() {
 
-        const response = await fetch("/latest");
+    try {
 
-        if (!response.ok)
-            return;
+        const response = await fetch(
+            "/latest?t=" + Date.now()
+        );
 
         const data = await response.json();
 
 
-        if (data.filename && data.filename !== lastImage)
-        {
+        // -----------------------------
+        // Image
+        // -----------------------------
 
-            lastImage = data.filename;
+        if (data.filename) {
 
+            if (lastFilename !== data.filename) {
 
-            document.getElementById("cameraStatus").innerText =
-                "Image received";
+                document.getElementById(
+                    "wasteImage"
+                ).src =
+                    "/images/" +
+                    data.filename +
+                    "?t=" +
+                    Date.now();
 
+                document.getElementById(
+                    "wasteImage"
+                ).style.display = "block";
 
-            const img = document.getElementById("image");
+                document.getElementById(
+                    "waiting"
+                ).style.display = "none";
 
-            img.src = "/images/" +
-                data.filename +
-                "?t=" +
-                Date.now();
-
-            img.style.display = "block";
-
-
-            const result =
-                document.getElementById("result");
-
-
-            result.innerText =
-                data.classification;
-
-
-            if (
-                data.classification
-                .toLowerCase()
-                .includes("biodegradable")
-            )
-            {
-                result.className = "bio";
+                lastFilename = data.filename;
             }
+        }
 
-            else if (
-                data.classification
-                .toLowerCase()
-                .includes("non")
-            )
-            {
-                result.className = "nonbio";
-            }
+
+        // -----------------------------
+        // Classification
+        // -----------------------------
+
+        const classification =
+            document.getElementById(
+                "classification"
+            );
+
+        classification.textContent =
+            data.classification || "Waiting...";
+
+
+        // Remove old classes
+        classification.className = "";
+
+
+        if (
+            data.classification ===
+            "Biodegradable"
+        ) {
+
+            classification.classList.add("bio");
+
+        }
+        else if (
+            data.classification ===
+            "Non-Biodegradable"
+        ) {
+
+            classification.classList.add("nonbio");
+
+        }
+        else {
+
+            classification.classList.add(
+                "processing"
+            );
 
         }
 
+
+        // -----------------------------
+        // Confidence
+        // -----------------------------
+
+        if (
+            data.confidence !== undefined &&
+            data.confidence !== null &&
+            data.confidence > 0
+        ) {
+
+            const percent =
+                (data.confidence * 100).toFixed(1);
+
+            document.getElementById(
+                "confidence"
+            ).textContent =
+                "Confidence: " +
+                percent +
+                "%";
+
+        }
+        else {
+
+            document.getElementById(
+                "confidence"
+            ).textContent =
+                "Confidence: -";
+
+        }
+
+
+        // -----------------------------
+        // Reason
+        // -----------------------------
+
+        document.getElementById(
+            "reason"
+        ).textContent =
+            data.reason || "";
+
     }
+    catch (error) {
 
-    catch(error)
-    {
+        console.error(error);
 
-        console.log(error);
+        document.getElementById(
+            "serverStatus"
+        ).textContent =
+            "Offline";
 
     }
 
 }
 
 
-setInterval(checkStatus, 1000);
+// =====================================
+// SERVER HEALTH
+// =====================================
+
+async function checkServer() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/health?t=" + Date.now()
+            );
+
+        const data =
+            await response.json();
+
+        document.getElementById(
+            "serverStatus"
+        ).textContent =
+            data.server === "online"
+                ? "Online"
+                : "Offline";
+
+    }
+    catch {
+
+        document.getElementById(
+            "serverStatus"
+        ).textContent =
+            "Offline";
+
+    }
+
+}
+
+
+// =====================================
+// AUTO UPDATE
+// =====================================
+
+updateResult();
+checkServer();
+
+setInterval(updateResult, 1000);
+setInterval(checkServer, 5000);
 
 </script>
-
 
 </body>
 
