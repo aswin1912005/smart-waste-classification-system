@@ -1,21 +1,37 @@
-#include "esp_camera.h"
+#include <Arduino.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
+#include "esp_camera.h"
 
-// =========================
-// Wi-Fi
-// =========================
-const char* ssid = "YOUR_WIFI_NAME";
-const char* password = "YOUR_WIFI_PASSWORD";
+// =====================================================
+// WiFi
+// =====================================================
 
-// =========================
-// Windows Flask Server
-// =========================
-const char* serverURL = "http://10.180.67.79:5000/upload";
+const char* WIFI_SSID = "YOUR_WIFI_NAME";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
-// =========================
-// AI Thinker ESP32-CAM pins
-// =========================
+// =====================================================
+// Flask Server
+// =====================================================
+
+const char* FLASK_SERVER = "10.180.67.79";
+const int FLASK_PORT = 5000;
+
+// =====================================================
+// Static ESP32-CAM IP
+// =====================================================
+
+IPAddress local_IP(10, 180, 67, 239);
+IPAddress gateway(10, 180, 67, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress primaryDNS(8, 8, 8, 8);
+IPAddress secondaryDNS(8, 8, 4, 4);
+
+// =====================================================
+// AI Thinker ESP32-CAM Pins
+// =====================================================
+
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
 #define XCLK_GPIO_NUM      0
@@ -35,254 +51,459 @@ const char* serverURL = "http://10.180.67.79:5000/upload";
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
+// =====================================================
+// Web server
+// =====================================================
+
+WebServer server(80);
+
+
+// =====================================================
+// Connect WiFi
+// =====================================================
 
 void connectWiFi() {
 
-  WiFi.mode(WIFI_STA);
+    Serial.println();
+    Serial.println("Connecting to WiFi...");
 
-  // Keep Wi-Fi awake for reliable uploads
-  WiFi.setSleep(false);
+    WiFi.mode(WIFI_STA);
 
-  Serial.println();
-  Serial.println("Connecting to WiFi...");
+    if (!WiFi.config(
+        local_IP,
+        gateway,
+        subnet,
+        primaryDNS,
+        secondaryDNS
+    )) {
 
-  WiFi.begin(ssid, password);
-
-  int attempts = 0;
-
-  while (WiFi.status() != WL_CONNECTED) {
-
-    delay(500);
-    Serial.print(".");
-
-    attempts++;
-
-    if (attempts >= 40) {
-      Serial.println();
-      Serial.println("WiFi connection failed!");
-      Serial.println("Restarting...");
-      ESP.restart();
+        Serial.println("Static IP configuration failed!");
     }
-  }
 
-  Serial.println();
-  Serial.println("WiFi connected!");
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  Serial.print("ESP32-CAM IP: ");
-  Serial.println(WiFi.localIP());
+    int attempts = 0;
 
-  Serial.print("Laptop Flask Server: ");
-  Serial.println(serverURL);
+    while (
+        WiFi.status() != WL_CONNECTED &&
+        attempts < 40
+    ) {
+
+        delay(500);
+        Serial.print(".");
+
+        attempts++;
+    }
+
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+
+        Serial.println("WiFi connected!");
+        Serial.print("ESP32-CAM IP: ");
+        Serial.println(WiFi.localIP());
+
+    } else {
+
+        Serial.println("WiFi connection failed!");
+    }
 }
 
 
-bool initializeCamera() {
+// =====================================================
+// Send image to Flask
+// =====================================================
 
-  camera_config_t config;
+bool uploadImage(camera_fb_t* fb) {
 
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
+    if (fb == nullptr) {
 
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
+        Serial.println("Camera frame is NULL!");
+        return false;
+    }
 
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
+    if (WiFi.status() != WL_CONNECTED) {
 
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
+        Serial.println("WiFi not connected!");
+        return false;
+    }
 
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
+    HTTPClient http;
 
-  config.xclk_freq_hz = 20000000;
+    String url =
+        "http://" +
+        String(FLASK_SERVER) +
+        ":" +
+        String(FLASK_PORT) +
+        "/upload";
 
-  config.pixel_format = PIXFORMAT_JPEG;
+    Serial.println();
+    Serial.println("Sending image to Flask...");
+    Serial.println(url);
 
-  // Image quality
-  config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 10;
-  config.fb_count = 2;
+    http.begin(url);
 
-  esp_err_t err = esp_camera_init(&config);
+    http.setTimeout(30000);
 
-  if (err != ESP_OK) {
+    String boundary = "----ESP32CAMBoundary";
 
-    Serial.print("Camera init failed: 0x");
-    Serial.println(err, HEX);
+    http.addHeader(
+        "Content-Type",
+        "multipart/form-data; boundary=" + boundary
+    );
 
-    return false;
-  }
+    String head =
+        "--" + boundary + "\r\n"
+        "Content-Disposition: form-data; name=\"image\"; filename=\"capture.jpg\"\r\n"
+        "Content-Type: image/jpeg\r\n\r\n";
 
-  Serial.println("Camera initialized!");
+    String tail =
+        "\r\n--" + boundary + "--\r\n";
 
-  return true;
+    size_t totalLength =
+        head.length() +
+        fb->len +
+        tail.length();
+
+    uint8_t* payload =
+        (uint8_t*)malloc(totalLength);
+
+    if (payload == nullptr) {
+
+        Serial.println("ERROR: Not enough memory for upload!");
+
+        http.end();
+
+        return false;
+    }
+
+    memcpy(
+        payload,
+        head.c_str(),
+        head.length()
+    );
+
+    memcpy(
+        payload + head.length(),
+        fb->buf,
+        fb->len
+    );
+
+    memcpy(
+        payload + head.length() + fb->len,
+        tail.c_str(),
+        tail.length()
+    );
+
+    Serial.print("Image size: ");
+    Serial.print(fb->len);
+    Serial.println(" bytes");
+
+    int httpCode =
+        http.POST(payload, totalLength);
+
+    Serial.print("Flask HTTP code: ");
+    Serial.println(httpCode);
+
+    if (httpCode > 0) {
+
+        String response =
+            http.getString();
+
+        Serial.println("Flask response:");
+        Serial.println(response);
+
+    } else {
+
+        Serial.print("Flask connection error: ");
+        Serial.println(
+            http.errorToString(httpCode)
+        );
+    }
+
+    free(payload);
+
+    http.end();
+
+    return httpCode >= 200 &&
+           httpCode < 300;
 }
 
 
-// =========================
-// Upload image to Flask
-// =========================
-bool uploadImage() {
+// =====================================================
+// Capture image
+// =====================================================
 
-  if (WiFi.status() != WL_CONNECTED) {
+void captureImage() {
 
-    Serial.println("WiFi disconnected!");
-    connectWiFi();
-  }
+    Serial.println();
+    Serial.println("==============================");
+    Serial.println("CAPTURE REQUEST RECEIVED");
+    Serial.println("==============================");
 
-  Serial.println();
-  Serial.println("Taking photo...");
+    camera_fb_t* fb =
+        esp_camera_fb_get();
 
-  camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) {
 
-  if (!fb) {
+        Serial.println(
+            "ERROR: Camera capture failed!"
+        );
 
-    Serial.println("Camera capture failed!");
+        server.send(
+            500,
+            "application/json",
+            "{\"status\":\"error\",\"message\":\"Camera capture failed\"}"
+        );
 
-    return false;
-  }
+        return;
+    }
 
-  Serial.print("Image size: ");
-  Serial.print(fb->len);
-  Serial.println(" bytes");
+    Serial.print("Captured image: ");
+    Serial.print(fb->len);
+    Serial.println(" bytes");
 
-  HTTPClient http;
-
-  http.setConnectTimeout(5000);
-  http.setTimeout(20000);
-
-  Serial.println("Connecting to Flask...");
-
-  if (!http.begin(serverURL)) {
-
-    Serial.println("HTTP begin failed!");
+    bool success =
+        uploadImage(fb);
 
     esp_camera_fb_return(fb);
 
-    return false;
-  }
+    if (success) {
 
-  String boundary = "----ESP32CAMBoundary";
+        server.send(
+            200,
+            "application/json",
+            "{\"status\":\"success\",\"message\":\"Image captured and uploaded\"}"
+        );
 
-  String head =
-    "--" + boundary + "\r\n"
-    "Content-Disposition: form-data; name=\"image\"; filename=\"esp32cam.jpg\"\r\n"
-    "Content-Type: image/jpeg\r\n\r\n";
+    } else {
 
-  String tail = "\r\n--" + boundary + "--\r\n";
-
-  size_t totalLength =
-    head.length() +
-    fb->len +
-    tail.length();
-
-  http.addHeader(
-    "Content-Type",
-    "multipart/form-data; boundary=" + boundary
-  );
-
-  http.addHeader(
-    "Content-Length",
-    String(totalLength)
-  );
-
-  // Send multipart data
-  WiFiClient* stream = http.getStreamPtr();
-
-  stream->print(head);
-
-  size_t written = 0;
-
-  while (written < fb->len) {
-
-    size_t chunkSize = 1024;
-
-    if (chunkSize > fb->len - written) {
-      chunkSize = fb->len - written;
+        server.send(
+            500,
+            "application/json",
+            "{\"status\":\"error\",\"message\":\"Image upload failed\"}"
+        );
     }
-
-    stream->write(
-      fb->buf + written,
-      chunkSize
-    );
-
-    written += chunkSize;
-  }
-
-  stream->print(tail);
-
-  Serial.println("Image uploaded. Waiting for Flask...");
-
-  int httpCode = http.GET();
-
-  // Some Flask servers expect POST.
-  // If GET is not accepted, use the POST method below.
-  Serial.print("HTTP response: ");
-  Serial.println(httpCode);
-
-  if (httpCode > 0) {
-
-    String response = http.getString();
-
-    Serial.println("Server response:");
-    Serial.println(response);
-
-  } else {
-
-    Serial.print("HTTP error: ");
-    Serial.println(http.errorToString(httpCode));
-  }
-
-  http.end();
-
-  esp_camera_fb_return(fb);
-
-  return httpCode > 0;
 }
 
+
+// =====================================================
+// Camera test
+// =====================================================
+
+void cameraRoot() {
+
+    String html =
+        "<html>"
+        "<head>"
+        "<title>ESP32-CAM</title>"
+        "</head>"
+        "<body>"
+        "<h1>ESP32-CAM Online</h1>"
+        "<p>IP: " +
+        WiFi.localIP().toString() +
+        "</p>"
+        "<p>Capture endpoint:</p>"
+        "<a href=\"/capture\">/capture</a>"
+        "</body>"
+        "</html>";
+
+    server.send(
+        200,
+        "text/html",
+        html
+    );
+}
+
+
+// =====================================================
+// Setup camera
+// =====================================================
+
+bool initializeCamera() {
+
+    camera_config_t config;
+
+    config.ledc_channel =
+        LEDC_CHANNEL_0;
+
+    config.ledc_timer =
+        LEDC_TIMER_0;
+
+    config.pin_d0 =
+        Y2_GPIO_NUM;
+
+    config.pin_d1 =
+        Y3_GPIO_NUM;
+
+    config.pin_d2 =
+        Y4_GPIO_NUM;
+
+    config.pin_d3 =
+        Y5_GPIO_NUM;
+
+    config.pin_d4 =
+        Y6_GPIO_NUM;
+
+    config.pin_d5 =
+        Y7_GPIO_NUM;
+
+    config.pin_d6 =
+        Y8_GPIO_NUM;
+
+    config.pin_d7 =
+        Y9_GPIO_NUM;
+
+    config.pin_xclk =
+        XCLK_GPIO_NUM;
+
+    config.pin_pclk =
+        PCLK_GPIO_NUM;
+
+    config.pin_vsync =
+        VSYNC_GPIO_NUM;
+
+    config.pin_href =
+        HREF_GPIO_NUM;
+
+    config.pin_sccb_sda =
+        SIOD_GPIO_NUM;
+
+    config.pin_sccb_scl =
+        SIOC_GPIO_NUM;
+
+    config.pin_pwdn =
+        PWDN_GPIO_NUM;
+
+    config.pin_reset =
+        RESET_GPIO_NUM;
+
+    config.xclk_freq_hz =
+        20000000;
+
+    config.pixel_format =
+        PIXFORMAT_JPEG;
+
+    if (psramFound()) {
+
+        config.frame_size =
+            FRAMESIZE_VGA;
+
+        config.jpeg_quality =
+            10;
+
+        config.fb_count =
+            2;
+
+    } else {
+
+        config.frame_size =
+            FRAMESIZE_QVGA;
+
+        config.jpeg_quality =
+            12;
+
+        config.fb_count =
+            1;
+    }
+
+    esp_err_t err =
+        esp_camera_init(&config);
+
+    if (err != ESP_OK) {
+
+        Serial.printf(
+            "Camera init failed: 0x%x\n",
+            err
+        );
+
+        return false;
+    }
+
+    sensor_t* sensor =
+        esp_camera_sensor_get();
+
+    if (sensor) {
+
+        sensor->set_brightness(
+            sensor,
+            0
+        );
+
+        sensor->set_contrast(
+            sensor,
+            0
+        );
+
+        sensor->set_saturation(
+            sensor,
+            0
+        );
+    }
+
+    return true;
+}
+
+
+// =====================================================
+// Setup
+// =====================================================
 
 void setup() {
 
-  Serial.begin(115200);
+    Serial.begin(115200);
 
-  delay(1000);
+    delay(1000);
 
-  Serial.println();
-  Serial.println("==============================");
-  Serial.println(" ESP32-CAM Waste System");
-  Serial.println("==============================");
+    Serial.println();
+    Serial.println("==============================");
+    Serial.println(" SMART WASTE ESP32-CAM");
+    Serial.println("==============================");
 
-  // Camera
-  if (!initializeCamera()) {
+    if (!initializeCamera()) {
 
-    Serial.println("Camera initialization failed!");
-    while (true) {
-      delay(1000);
+        Serial.println(
+            "Camera initialization failed!"
+        );
+
+        while (true) {
+            delay(1000);
+        }
     }
-  }
 
-  // Wi-Fi
-  connectWiFi();
+    Serial.println("Camera initialized.");
 
-  Serial.println();
-  Serial.println("System ready!");
+    connectWiFi();
+
+    server.on(
+        "/",
+        HTTP_GET,
+        cameraRoot
+    );
+
+    server.on(
+        "/capture",
+        HTTP_GET,
+        captureImage
+    );
+
+    server.begin();
+
+    Serial.println();
+    Serial.println("ESP32-CAM server started.");
+    Serial.print("Camera URL: http://");
+    Serial.println(WiFi.localIP());
+    Serial.println("Capture: /capture");
 }
 
 
+// =====================================================
+// Loop
+// =====================================================
+
 void loop() {
 
-  // No automatic photo capture here.
-  // Your ESP32 DevKit can request /capture
-  // when the IR sensor detects waste.
+    server.handleClient();
 
-  delay(1000);
+    delay(2);
 }
