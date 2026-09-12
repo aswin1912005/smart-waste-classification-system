@@ -5,10 +5,15 @@
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <title>Smart Waste Classification</title>
+    <title>
+        Smart Waste Classification
+    </title>
+
 
     <style>
 
@@ -16,368 +21,620 @@
             box-sizing: border-box;
         }
 
+
         body {
+
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f2f5f7;
-            color: #222;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            background:
+                #f4f6f8;
+
+            color:
+                #222;
         }
 
-        .header {
-            background: #1f2937;
-            color: white;
-            padding: 22px;
-            text-align: center;
+
+        header {
+
+            background:
+                #1f2937;
+
+            color:
+                white;
+
+            padding:
+                25px;
+
+            text-align:
+                center;
         }
 
-        .header h1 {
-            margin: 0;
-            font-size: 30px;
+
+        header h1 {
+
+            margin:
+                0;
+
+            font-size:
+                30px;
         }
 
-        .header p {
-            margin: 8px 0 0;
-            color: #d1d5db;
+
+        header p {
+
+            margin-top:
+                8px;
+
+            opacity:
+                0.8;
         }
+
 
         .container {
-            max-width: 900px;
-            margin: 35px auto;
-            padding: 20px;
+
+            max-width:
+                1100px;
+
+            margin:
+                30px auto;
+
+            padding:
+                20px;
         }
+
+
+        .grid {
+
+            display:
+                grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(
+                        300px,
+                        1fr
+                    )
+                );
+
+            gap:
+                20px;
+        }
+
 
         .card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+
+            background:
+                white;
+
+            border-radius:
+                15px;
+
+            padding:
+                25px;
+
+            box-shadow:
+                0 4px 15px
+                rgba(
+                    0,
+                    0,
+                    0,
+                    0.08
+                );
         }
 
-        .image-box {
-            width: 100%;
-            min-height: 300px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #e5e7eb;
-            border-radius: 12px;
-            overflow: hidden;
+
+        .card h2 {
+
+            margin-top:
+                0;
         }
 
-        .image-box img {
-            max-width: 100%;
-            max-height: 500px;
-            display: none;
+
+        #wasteImage {
+
+            width:
+                100%;
+
+            max-height:
+                500px;
+
+            object-fit:
+                contain;
+
+            border-radius:
+                12px;
+
+            background:
+                #eee;
         }
 
-        #waiting {
-            color: #6b7280;
-            font-size: 20px;
+
+        .classification {
+
+            font-size:
+                32px;
+
+            font-weight:
+                bold;
+
+            margin:
+                20px 0;
         }
 
-        .result {
-            margin-top: 25px;
-            padding: 25px;
-            border-radius: 12px;
-            text-align: center;
-            background: #f9fafb;
+
+        .confidence {
+
+            font-size:
+                22px;
+
+            margin:
+                10px 0;
         }
 
-        #classification {
-            font-size: 32px;
-            font-weight: bold;
-            margin: 10px;
+
+        .reason {
+
+            background:
+                #f3f4f6;
+
+            padding:
+                15px;
+
+            border-radius:
+                10px;
+
+            line-height:
+                1.5;
         }
 
-        #confidence {
-            font-size: 20px;
-            margin: 10px;
-        }
-
-        #reason {
-            font-size: 17px;
-            color: #555;
-            margin-top: 15px;
-        }
-
-        .bio {
-            color: #15803d;
-        }
-
-        .nonbio {
-            color: #dc2626;
-        }
-
-        .processing {
-            color: #ea580c;
-        }
 
         .status {
-            margin-top: 20px;
-            text-align: center;
-            color: #555;
+
+            padding:
+                12px;
+
+            border-radius:
+                8px;
+
+            margin-bottom:
+                10px;
+        }
+
+
+        .online {
+
+            background:
+                #dcfce7;
+        }
+
+
+        .offline {
+
+            background:
+                #fee2e2;
+        }
+
+
+        .processing {
+
+            background:
+                #fef3c7;
+        }
+
+
+        .network {
+
+            line-height:
+                1.8;
+        }
+
+
+        .small {
+
+            color:
+                #666;
+
+            font-size:
+                14px;
         }
 
     </style>
 
 </head>
 
+
 <body>
 
-    <div class="header">
 
-        <h1>♻️ Smart Waste Classification</h1>
+<header>
 
-        <p>
-            ESP32-CAM + Gemini AI
-        </p>
+    <h1>
+        ♻️ Smart Waste Classification System
+    </h1>
+
+    <p>
+        ESP32-CAM + Flask + Gemini AI
+    </p>
+
+</header>
+
+
+<div class="container">
+
+
+    <div class="grid">
+
+
+        <!-- IMAGE -->
+
+        <div class="card">
+
+            <h2>
+                📷 Latest Waste Image
+            </h2>
+
+            <img
+                id="wasteImage"
+                src=""
+                alt="Waiting for image..."
+            >
+
+            <p
+                id="imageStatus"
+                class="small"
+            >
+                Waiting for ESP32-CAM...
+            </p>
+
+        </div>
+
+
+        <!-- RESULT -->
+
+        <div class="card">
+
+            <h2>
+                🤖 AI Classification
+            </h2>
+
+
+            <div
+                id="classification"
+                class="classification"
+            >
+                Waiting...
+            </div>
+
+
+            <div
+                id="confidence"
+                class="confidence"
+            >
+                Confidence: -
+            </div>
+
+
+            <h3>
+                Reason
+            </h3>
+
+
+            <div
+                id="reason"
+                class="reason"
+            >
+                Waiting for Gemini analysis...
+            </div>
+
+
+            <p
+                id="timestamp"
+                class="small"
+            >
+                -
+            </p>
+
+        </div>
+
 
     </div>
 
 
-    <div class="container">
+    <!-- SERVER STATUS -->
 
-        <div class="card">
+    <div
+        class="card"
+        style="margin-top:20px"
+    >
 
-            <div class="image-box">
-
-                <div id="waiting">
-                    Waiting for waste...
-                </div>
-
-                <img id="wasteImage"
-                     alt="Waste Image">
-
-            </div>
+        <h2>
+            🌐 System Status
+        </h2>
 
 
-            <div class="result">
-
-                <div id="classification"
-                     class="processing">
-
-                    Waiting...
-
-                </div>
-
-                <div id="confidence">
-                    Confidence: -
-                </div>
-
-                <div id="reason">
-                    Place waste on the sensor.
-                </div>
-
-            </div>
+        <div
+            id="serverStatus"
+            class="status processing"
+        >
+            Checking server...
+        </div>
 
 
-            <div class="status">
+        <div class="network">
 
-                Server:
-                <span id="serverStatus">
-                    Checking...
-                </span>
+            <b>
+                Flask Server:
+            </b>
 
-            </div>
+            <span id="serverAddress">
+                -
+            </span>
+
+            <br>
+
+
+            <b>
+                ESP32-CAM:
+            </b>
+
+            <span id="cameraAddress">
+                -
+            </span>
+
+            <br>
+
+
+            <b>
+                Gemini:
+            </b>
+
+            <span id="geminiStatus">
+                -
+            </span>
 
         </div>
 
     </div>
 
 
+</div>
+
+
 <script>
 
-let lastFilename = null;
+
+let lastImage = "";
 
 
-// =====================================
-// GET LATEST RESULT
-// =====================================
-
-async function updateResult() {
-
-    try {
-
-        const response = await fetch(
-            "/latest?t=" + Date.now()
-        );
-
-        const data = await response.json();
-
-
-        // -----------------------------
-        // Image
-        // -----------------------------
-
-        if (data.filename) {
-
-            if (lastFilename !== data.filename) {
-
-                document.getElementById(
-                    "wasteImage"
-                ).src =
-                    "/images/" +
-                    data.filename +
-                    "?t=" +
-                    Date.now();
-
-                document.getElementById(
-                    "wasteImage"
-                ).style.display = "block";
-
-                document.getElementById(
-                    "waiting"
-                ).style.display = "none";
-
-                lastFilename = data.filename;
-            }
-        }
-
-
-        // -----------------------------
-        // Classification
-        // -----------------------------
-
-        const classification =
-            document.getElementById(
-                "classification"
-            );
-
-        classification.textContent =
-            data.classification || "Waiting...";
-
-
-        // Remove old classes
-        classification.className = "";
-
-
-        if (
-            data.classification ===
-            "Biodegradable"
-        ) {
-
-            classification.classList.add("bio");
-
-        }
-        else if (
-            data.classification ===
-            "Non-Biodegradable"
-        ) {
-
-            classification.classList.add("nonbio");
-
-        }
-        else {
-
-            classification.classList.add(
-                "processing"
-            );
-
-        }
-
-
-        // -----------------------------
-        // Confidence
-        // -----------------------------
-
-        if (
-            data.confidence !== undefined &&
-            data.confidence !== null &&
-            data.confidence > 0
-        ) {
-
-            const percent =
-                (data.confidence * 100).toFixed(1);
-
-            document.getElementById(
-                "confidence"
-            ).textContent =
-                "Confidence: " +
-                percent +
-                "%";
-
-        }
-        else {
-
-            document.getElementById(
-                "confidence"
-            ).textContent =
-                "Confidence: -";
-
-        }
-
-
-        // -----------------------------
-        // Reason
-        // -----------------------------
-
-        document.getElementById(
-            "reason"
-        ).textContent =
-            data.reason || "";
-
-    }
-    catch (error) {
-
-        console.error(error);
-
-        document.getElementById(
-            "serverStatus"
-        ).textContent =
-            "Offline";
-
-    }
-
-}
-
-
-// =====================================
-// SERVER HEALTH
-// =====================================
-
-async function checkServer() {
+async function updateLatest() {
 
     try {
 
         const response =
             await fetch(
-                "/health?t=" + Date.now()
+                "/latest?t=" +
+                Date.now()
             );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Latest request failed"
+            );
+        }
+
 
         const data =
             await response.json();
 
-        document.getElementById(
-            "serverStatus"
-        ).textContent =
-            data.server === "online"
-                ? "Online"
-                : "Offline";
 
-    }
-    catch {
+        // -------------------------------------
+        // Classification
+        // -------------------------------------
+
+        const classification =
+            data.classification ||
+            "Waiting...";
+
 
         document.getElementById(
-            "serverStatus"
+            "classification"
         ).textContent =
-            "Offline";
+            classification;
+
+
+        // -------------------------------------
+        // Confidence
+        // -------------------------------------
+
+        let confidence = 0;
+
+
+        if (
+            data.confidence_percent !==
+            undefined
+        ) {
+
+            confidence =
+                data.confidence_percent;
+
+        } else if (
+            data.confidence !==
+            undefined
+        ) {
+
+            confidence =
+                Number(
+                    data.confidence
+                ) * 100;
+        }
+
+
+        document.getElementById(
+            "confidence"
+        ).textContent =
+            "Confidence: " +
+            confidence.toFixed(2) +
+            "%";
+
+
+        // -------------------------------------
+        // Reason
+        // -------------------------------------
+
+        document.getElementById(
+            "reason"
+        ).textContent =
+            data.reason ||
+            "Waiting for analysis...";
+
+
+        // -------------------------------------
+        // Timestamp
+        // -------------------------------------
+
+        if (data.timestamp) {
+
+            document.getElementById(
+                "timestamp"
+            ).textContent =
+                data.timestamp;
+        }
+
+
+        // -------------------------------------
+        // Image
+        // -------------------------------------
+
+        if (
+            data.image &&
+            data.image !== lastImage
+        ) {
+
+            lastImage =
+                data.image;
+
+
+            document.getElementById(
+                "wasteImage"
+            ).src =
+                "/images/" +
+                encodeURIComponent(
+                    data.image
+                ) +
+                "?t=" +
+                Date.now();
+
+
+            document.getElementById(
+                "imageStatus"
+            ).textContent =
+                "Latest image received.";
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
 
     }
 
 }
 
 
-// =====================================
-// AUTO UPDATE
-// =====================================
+async function updateHealth() {
 
-updateResult();
-checkServer();
+    try {
 
-setInterval(updateResult, 1000);
-setInterval(checkServer, 5000);
+        const response =
+            await fetch(
+                "/health?t=" +
+                Date.now()
+            );
+
+
+        const data =
+            await response.json();
+
+
+        document.getElementById(
+            "serverStatus"
+        ).textContent =
+            "🟢 Flask server online";
+
+
+        document.getElementById(
+            "serverStatus"
+        ).className =
+            "status online";
+
+
+        document.getElementById(
+            "serverAddress"
+        ).textContent =
+            data.server_ip +
+            ":" +
+            data.server_port;
+
+
+        document.getElementById(
+            "cameraAddress"
+        ).textContent =
+            data.camera_ip;
+
+
+        document.getElementById(
+            "geminiStatus"
+        ).textContent =
+            data.gemini;
+
+
+    } catch (error) {
+
+        document.getElementById(
+            "serverStatus"
+        ).textContent =
+            "🔴 Flask server offline";
+
+
+        document.getElementById(
+            "serverStatus"
+        ).className =
+            "status offline";
+
+    }
+
+}
+
+
+updateLatest();
+
+updateHealth();
+
+
+setInterval(
+    updateLatest,
+    1000
+);
+
+
+setInterval(
+    updateHealth,
+    5000
+);
+
 
 </script>
+
 
 </body>
 
